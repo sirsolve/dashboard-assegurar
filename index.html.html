@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard Consolidado – Assegurar</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg:#0a0c12; --card:#161b28; --border:rgba(255,255,255,0.06);
+    --int:#3b82f6; --ext:#f59e0b; --accent2:#22d3ee; --accent4:#a78bfa;
+    --success:#10b981; --danger:#ef4444; --text:#e8eaf0; --muted:#6b7280;
+  }
+  html { scroll-behavior:smooth; }
+  body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; overflow-x:hidden; }
+  body::before {
+    content:''; position:fixed; inset:0; pointer-events:none; z-index:0; opacity:0.5;
+    background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  }
+  header {
+    position:relative; z-index:1; padding:40px 48px 32px;
+    border-bottom:1px solid var(--border);
+    display:flex; align-items:flex-end; justify-content:space-between; gap:24px;
+    background:linear-gradient(135deg,rgba(59,130,246,0.06) 0%,rgba(245,158,11,0.06) 100%);
+  }
+  .header-left h1 {
+    font-family:'Syne',sans-serif; font-size:clamp(1.6rem,3vw,2.4rem); font-weight:800;
+    letter-spacing:-0.03em; line-height:1.1;
+    background:linear-gradient(135deg,#e8eaf0 0%,var(--accent2) 100%);
+    -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
+  }
+  .header-left p { margin-top:6px; font-size:0.85rem; color:var(--muted); letter-spacing:0.04em; text-transform:uppercase; }
+  .header-badges { display:flex; gap:10px; flex-wrap:wrap; }
+  .badge {
+    display:inline-flex; align-items:center; gap:6px;
+    border-radius:100px; padding:6px 14px; font-size:0.75rem; font-weight:500;
+    letter-spacing:0.05em; text-transform:uppercase;
+  }
+  .badge::before { content:''; width:6px; height:6px; border-radius:50%; box-shadow:0 0 8px currentColor; animation:pulse 2s infinite; }
+  .badge-int { background:rgba(59,130,246,0.1); border:1px solid rgba(59,130,246,0.25); color:var(--int); }
+  .badge-int::before { background:var(--int); }
+  .badge-ext { background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.25); color:var(--ext); }
+  .badge-ext::before { background:var(--ext); }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  .dashboard { position:relative; z-index:1; padding:36px 48px 60px; max-width:1600px; margin:0 auto; }
+  .section-label {
+    font-family:'Syne',sans-serif; font-size:0.7rem; font-weight:700;
+    letter-spacing:0.18em; text-transform:uppercase; color:var(--muted);
+    margin-bottom:16px; display:flex; align-items:center; gap:10px;
+  }
+  .section-label::after { content:''; flex:1; height:1px; background:var(--border); }
+  .mb-section { margin-bottom:40px; }
+
+  /* KPIs */
+  .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:16px; margin-bottom:40px; }
+  .kpi-card {
+    background:var(--card); border:1px solid var(--border); border-radius:16px;
+    padding:22px 20px; position:relative; overflow:hidden;
+    transition:transform 0.2s,border-color 0.2s; animation:fadeUp 0.5s both;
+  }
+  .kpi-card:hover { transform:translateY(-3px); border-color:rgba(255,255,255,0.12); }
+  .kpi-card::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; border-radius:16px 16px 0 0; }
+  .kpi-card.int::before    { background:linear-gradient(90deg,var(--int),var(--accent2)); }
+  .kpi-card.ext::before    { background:linear-gradient(90deg,var(--ext),#fb923c); }
+  .kpi-card.total::before  { background:linear-gradient(90deg,var(--accent4),var(--accent2)); }
+  .kpi-card.green::before  { background:linear-gradient(90deg,var(--success),var(--accent2)); }
+  .kpi-card.red::before    { background:linear-gradient(90deg,var(--danger),#f97316); }
+  .kpi-card.amber::before  { background:linear-gradient(90deg,var(--ext),#fb923c); }
+  .kpi-icon  { font-size:1.2rem; margin-bottom:12px; display:block; }
+  .kpi-label { font-size:0.7rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.08em; font-weight:500; }
+  .kpi-value { font-family:'Syne',sans-serif; font-size:clamp(1.5rem,2.2vw,2rem); font-weight:800; line-height:1.1; margin:5px 0 3px; letter-spacing:-0.03em; }
+  .kpi-value.int{color:var(--int)} .kpi-value.ext{color:var(--ext)} .kpi-value.total{color:var(--accent4)}
+  .kpi-value.green{color:var(--success)} .kpi-value.red{color:var(--danger)} .kpi-value.amber{color:var(--ext)}
+  .kpi-sub { font-size:0.73rem; color:var(--muted); }
+  .tag { display:inline-block; padding:1px 7px; border-radius:100px; font-size:0.65rem; font-weight:600; }
+  .tag-up { background:rgba(16,185,129,0.15); color:var(--success); }
+  .tag-down { background:rgba(239,68,68,0.15); color:var(--danger); }
+
+  /* Charts */
+  .chart-grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:20px; }
+  .chart-grid-3 { display:grid; grid-template-columns:2fr 1fr; gap:20px; margin-bottom:20px; }
+  .chart-card {
+    background:var(--card); border:1px solid var(--border); border-radius:20px;
+    padding:28px 28px 22px; animation:fadeUp 0.6s both; position:relative; overflow:hidden;
+  }
+  .chart-card::after { content:''; position:absolute; inset:0; background:radial-gradient(ellipse 60% 40% at 80% 0%,rgba(59,130,246,0.03),transparent); pointer-events:none; }
+  .chart-title    { font-family:'Syne',sans-serif; font-size:0.95rem; font-weight:700; margin-bottom:4px; }
+  .chart-subtitle { font-size:0.75rem; color:var(--muted); margin-bottom:20px; }
+
+  /* META CARDS */
+  .meta-section { display:grid; grid-template-columns:1fr 1fr 1fr; gap:20px; margin-bottom:40px; }
+  .meta-card {
+    background:var(--card); border:1px solid var(--border); border-radius:20px;
+    padding:24px 24px 20px; position:relative; overflow:hidden; animation:fadeUp 0.5s both;
+  }
+  .meta-card::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; border-radius:20px 20px 0 0; }
+  .meta-card.int::before   { background:linear-gradient(90deg,var(--int),var(--accent2)); }
+  .meta-card.ext::before   { background:linear-gradient(90deg,var(--ext),#fb923c); }
+  .meta-card.total::before { background:linear-gradient(90deg,var(--accent4),var(--accent2)); }
+  .meta-title { font-family:'Syne',sans-serif; font-size:0.85rem; font-weight:700; margin-bottom:4px; }
+  .meta-sub   { font-size:0.72rem; color:var(--muted); margin-bottom:16px; }
+  .meta-nums  { display:flex; gap:16px; margin-bottom:14px; flex-wrap:wrap; }
+  .meta-num   { text-align:center; }
+  .meta-num-val { font-family:'Syne',sans-serif; font-size:1.5rem; font-weight:800; line-height:1; }
+  .meta-num-lbl { font-size:0.65rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.06em; margin-top:3px; }
+  .meta-bar-wrap { background:rgba(255,255,255,0.06); border-radius:100px; height:10px; overflow:hidden; position:relative; margin-bottom:6px; }
+  .meta-bar-proj { position:absolute; left:0; top:0; height:10px; border-radius:100px; }
+  .meta-bar-real { height:100%; border-radius:100px; position:relative; z-index:1; }
+  .meta-bar-real::after { content:''; position:absolute; inset:0; background:linear-gradient(90deg,transparent,rgba(255,255,255,0.2),transparent); animation:shimmer 2s infinite; }
+  @keyframes shimmer { 0%{transform:translateX(-100%)} 100%{transform:translateX(100%)} }
+  .meta-bar-labels { display:flex; justify-content:space-between; font-size:0.68rem; color:var(--muted); }
+  .meta-insight { margin-top:12px; padding:10px 12px; border-radius:8px; font-size:0.75rem; line-height:1.55; }
+  .meta-insight.danger { background:rgba(239,68,68,0.07); border:1px solid rgba(239,68,68,0.2); }
+  .meta-insight.warn   { background:rgba(245,158,11,0.07); border:1px solid rgba(245,158,11,0.2); }
+  .meta-insight.ok     { background:rgba(16,185,129,0.07); border:1px solid rgba(16,185,129,0.2); }
+
+  /* VENDOR CARDS */
+  .vendor-section { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:16px; margin-bottom:40px; }
+  .vendor-card {
+    background:var(--card); border:1px solid var(--border); border-radius:16px;
+    padding:20px; position:relative; overflow:hidden; animation:fadeUp 0.5s both;
+    transition:transform 0.2s,border-color 0.2s;
+  }
+  .vendor-card:hover { transform:translateY(-2px); border-color:rgba(255,255,255,0.1); }
+  .vendor-card::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; border-radius:16px 16px 0 0; }
+  .vc-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+  .vc-name { font-family:'Syne',sans-serif; font-size:1rem; font-weight:800; }
+  .vc-team { font-size:0.65rem; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; padding:3px 10px; border-radius:100px; }
+  .vc-team.int { background:rgba(59,130,246,0.12); color:var(--int); border:1px solid rgba(59,130,246,0.25); }
+  .vc-team.ext { background:rgba(245,158,11,0.12); color:var(--ext); border:1px solid rgba(245,158,11,0.25); }
+  .vc-stats { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-bottom:14px; }
+  .vc-stat { background:rgba(255,255,255,0.03); border-radius:8px; padding:8px 10px; text-align:center; }
+  .vc-stat-val { font-family:'Syne',sans-serif; font-size:1.1rem; font-weight:800; }
+  .vc-stat-lbl { font-size:0.62rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em; margin-top:2px; }
+  .vc-bar-wrap { background:rgba(255,255,255,0.06); border-radius:100px; height:6px; overflow:hidden; margin-bottom:4px; }
+  .vc-bar-fill { height:100%; border-radius:100px; }
+  .vc-bar-label { display:flex; justify-content:space-between; font-size:0.68rem; color:var(--muted); }
+  .vc-months { display:flex; gap:4px; margin-top:12px; flex-wrap:wrap; }
+  .vc-month { font-size:0.65rem; padding:3px 7px; border-radius:6px; background:rgba(255,255,255,0.04); color:var(--muted); }
+  .vc-month.best { color:var(--success); background:rgba(16,185,129,0.1); font-weight:700; }
+
+  /* RANK */
+  .rank-table { width:100%; border-collapse:collapse; }
+  .rank-table tr { border-bottom:1px solid var(--border); transition:background 0.15s; }
+  .rank-table tr:last-child { border-bottom:none; }
+  .rank-table tr:hover { background:rgba(255,255,255,0.03); }
+  .rank-table td { padding:9px 0; font-size:0.82rem; vertical-align:middle; }
+  .rank-table .pos { width:28px; font-family:'Syne',sans-serif; font-weight:800; color:var(--muted); }
+  .rank-table .pos.gold{color:#fbbf24} .rank-table .pos.silver{color:#94a3b8} .rank-table .pos.bronze{color:#cd7c53}
+  .rank-bar-wrap { padding:0 10px; width:100%; }
+  .rank-bar-bg   { background:rgba(255,255,255,0.06); border-radius:100px; height:5px; overflow:hidden; }
+  .rank-bar-fill { height:100%; border-radius:100px; }
+  .rank-val { font-family:'Syne',sans-serif; font-weight:700; font-size:0.9rem; white-space:nowrap; text-align:right; }
+
+  @keyframes fadeUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
+  .kpi-card:nth-child(1){animation-delay:.03s} .kpi-card:nth-child(2){animation-delay:.06s}
+  .kpi-card:nth-child(3){animation-delay:.09s} .kpi-card:nth-child(4){animation-delay:.12s}
+  .kpi-card:nth-child(5){animation-delay:.15s} .kpi-card:nth-child(6){animation-delay:.18s}
+  .kpi-card:nth-child(7){animation-delay:.21s} .kpi-card:nth-child(8){animation-delay:.24s}
+  /* ABAS DE NAVEGAÇÃO */
+  .tab-nav {
+    position:relative; z-index:2; display:flex; gap:0; border-bottom:1px solid var(--border);
+    background:rgba(255,255,255,0.02); padding:0 48px;
+  }
+  .tab-btn {
+    font-family:'Syne',sans-serif; font-size:0.78rem; font-weight:700;
+    letter-spacing:0.06em; text-transform:uppercase; padding:16px 24px;
+    border:none; background:transparent; color:var(--muted); cursor:pointer;
+    border-bottom:3px solid transparent; transition:all 0.2s; position:relative; top:1px;
+  }
+  .tab-btn:hover { color:var(--text); }
+  .tab-btn.active { color:var(--accent2); border-bottom-color:var(--accent2); }
+  .tab-page { display:none; }
+  .tab-page.active { display:block; }
+
+  /* RANKING GERAL */
+  .rank-full-table { width:100%; border-collapse:collapse; }
+  .rank-full-table tr { border-bottom:1px solid var(--border); transition:background 0.15s; }
+  .rank-full-table tr:last-child { border-bottom:none; }
+  .rank-full-table tr:hover { background:rgba(255,255,255,0.03); }
+  .rank-full-table td { padding:12px 8px; font-size:0.82rem; vertical-align:middle; }
+  .rank-pos { width:32px; font-family:'Syne',sans-serif; font-weight:800; font-size:1rem; }
+  .rank-pos.gold{color:#fbbf24} .rank-pos.silver{color:#94a3b8} .rank-pos.bronze{color:#cd7c53}
+
+  /* IA */
+  .ai-card {
+    background:var(--card); border:1px solid var(--border); border-radius:20px;
+    padding:28px; margin-bottom:20px; position:relative; overflow:hidden;
+  }
+  .ai-card::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; border-radius:20px 20px 0 0; }
+  .ai-card.insight::before  { background:linear-gradient(90deg,var(--accent2),var(--accent4)); }
+  .ai-card.alert::before    { background:linear-gradient(90deg,var(--danger),#f97316); }
+  .ai-card.positive::before { background:linear-gradient(90deg,var(--success),var(--accent2)); }
+  .ai-card.neutral::before  { background:linear-gradient(90deg,var(--accent4),var(--ext)); }
+  .ai-card-title { font-family:'Syne',sans-serif; font-size:0.95rem; font-weight:700; margin-bottom:10px; display:flex; align-items:center; gap:8px; }
+  .ai-card-body  { font-size:0.83rem; color:var(--muted); line-height:1.7; }
+  .ai-card-body strong { color:var(--text); }
+  .ai-loading { text-align:center; padding:60px; color:var(--muted); font-size:0.85rem; }
+  .ai-loading .spinner { width:36px; height:36px; border:3px solid rgba(34,211,238,0.15); border-top-color:var(--accent2); border-radius:50%; animation:spin 0.8s linear infinite; margin:0 auto 16px; }
+  @keyframes spin { to{transform:rotate(360deg)} }
+  .ai-refresh-btn {
+    display:inline-flex; align-items:center; gap:6px; margin-top:20px;
+    padding:8px 18px; border-radius:100px; border:1px solid rgba(34,211,238,0.3);
+    background:rgba(34,211,238,0.08); color:var(--accent2);
+    font-family:'Syne',sans-serif; font-size:0.72rem; font-weight:700;
+    text-transform:uppercase; letter-spacing:0.06em; cursor:pointer; transition:all 0.2s;
+  }
+  .ai-refresh-btn:hover { background:rgba(34,211,238,0.15); }
+  .ai-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:20px; }
+  @media(max-width:900px){ .ai-grid{grid-template-columns:1fr} .tab-nav{padding:0 16px} }
+  @media(max-width:600px){.kpi-grid{grid-template-columns:1fr 1fr} .vendor-section{grid-template-columns:1fr}}
+  ::-webkit-scrollbar{width:6px} ::-webkit-scrollbar-track{background:var(--bg)} ::-webkit-scrollbar-thumb{background:#2a3045;border-radius:3px}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <h1>Dashboard Consolidado</h1>
+    <p>Assegurar · Interno + Externo · Out/25 – Abr/26</p>
+  </div>
+  <div class="header-badges">
+    <span class="badge badge-int">🏢 Interno · 7 vendedores</span>
+    <span class="badge badge-ext">🌐 Externo · 3 vendedoras</span>
+  </div>
+</header>
+
+<!-- ABAS -->
+<nav class="tab-nav">
+  <button class="tab-btn active" onclick="switchTab('overview')">📊 Visão Geral</button>
+  <button class="tab-btn" onclick="switchTab('ranking')">🏆 Ranking Consultores</button>
+  <button class="tab-btn" onclick="switchTab('ia')">🤖 Análise IA</button>
+</nav>
+
+<!-- ABA 1: VISÃO GERAL -->
+<div class="tab-page active" id="tab-overview">
+<div class="dashboard">
+
+  <!-- KPIs GERAIS -->
+  <div class="section-label">Visão Geral Consolidada</div>
+  <div class="kpi-grid mb-section" id="kpiGeral"></div>
+
+  <!-- META DO MÊS -->
+  <div class="section-label">Meta do Mês — Abril/26</div>
+  <div class="meta-section mb-section" id="metaSection"></div>
+
+  <!-- EVOLUÇÃO -->
+  <div class="section-label">Evolução Mensal</div>
+  <div class="chart-grid-3 mb-section">
+    <div class="chart-card">
+      <div class="chart-title">Vendas Consolidadas — Evolução Mensal</div>
+      <div class="chart-subtitle">Interno + Externo · total por mês</div>
+      <canvas id="chartEvolucao" height="200"></canvas>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Participação por Time</div>
+      <div class="chart-subtitle">Fatia de cada equipe no total acumulado</div>
+      <div style="max-width:260px;margin:0 auto"><canvas id="chartDonut" height="240"></canvas></div>
+    </div>
+  </div>
+
+  <!-- RANKING CONSOLIDADO -->
+  <div class="section-label">Ranking Consolidado — Todos os Vendedores</div>
+  <div class="chart-grid-2 mb-section">
+    <div class="chart-card">
+      <div class="chart-title">Ranking Geral (Acumulado)</div>
+      <div class="chart-subtitle">Total de vendas Out/25 → Abr/26 · interno + externo</div>
+      <table class="rank-table" id="rankGeral"></table>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Vendas em Abril/26 — Ranking</div>
+      <div class="chart-subtitle">Desempenho individual em Abril/26</div>
+      <table class="rank-table" id="rankMar"></table>
+    </div>
+  </div>
+
+  <!-- CARDS INDIVIDUAIS -->
+  <div class="section-label">Perfil Individual — Todos os Vendedores</div>
+  <div class="vendor-section" id="vendorCards"></div>
+
+  <!-- COMPARATIVO MENSAL -->
+  <div class="section-label">Desempenho Individual — Mês a Mês</div>
+  <div class="chart-grid-2 mb-section">
+    <div class="chart-card">
+      <div class="chart-title">Vendas por Vendedor Interno — Evolução Mensal</div>
+      <div class="chart-subtitle">Comparativo individual dos 7 vendedores internos</div>
+      <canvas id="chartVendInt" height="200"></canvas>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Vendas por Vendedora Externa — Evolução Mensal</div>
+      <div class="chart-subtitle">Comparativo individual das 3 vendedoras externas</div>
+      <canvas id="chartVendExt" height="200"></canvas>
+    </div>
+  </div>
+
+  <!-- COMPARATIVO TIMES -->
+  <div class="section-label">Comparativo por Time — Mês a Mês</div>
+  <div class="chart-card mb-section">
+    <div class="chart-title">Interno vs Externo — Evolução Mensal</div>
+    <div class="chart-subtitle">Volume de vendas por time ao longo dos meses</div>
+    <canvas id="chartTimes" height="130"></canvas>
+  </div>
+
+</div><!-- /dashboard -->
+</div><!-- /tab-overview -->
+
+<!-- ABA 2: RANKING GERAL -->
+<div class="tab-page" id="tab-ranking">
+<div class="dashboard">
+  <div class="section-label">Ranking Geral — Todos os Consultores</div>
+  <div class="chart-card mb-section">
+    <div class="chart-title">🏆 Ranking por Desempenho Acumulado</div>
+    <div class="chart-subtitle" id="rankFullSub">Total de vendas Out/25 → Abr/26 · Interno + Externo</div>
+    <table class="rank-full-table" id="rankFullTable" style="margin-top:12px"></table>
+  </div>
+  <div class="chart-grid-2 mb-section">
+    <div class="chart-card">
+      <div class="chart-title">🏅 Ranking — Mês Atual (Abr/26)</div>
+      <div class="chart-subtitle">Desempenho individual em Abril</div>
+      <table class="rank-full-table" id="rankAbrTable" style="margin-top:12px"></table>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">📈 Evolução de Posição — Mar vs Abr</div>
+      <div class="chart-subtitle">Ganho ou perda de posição no ranking</div>
+      <div id="rankMovimento" style="margin-top:12px"></div>
+    </div>
+  </div>
+</div>
+</div><!-- /tab-ranking -->
+
+<!-- ABA 3: ANÁLISE IA -->
+<div class="tab-page" id="tab-ia">
+<div class="dashboard">
+  <div class="section-label">Análise de IA — Desempenho &amp; Gargalos</div>
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;flex-wrap:wrap">
+    <div style="font-size:0.82rem;color:var(--muted)">Análise gerada com base nos dados atuais da equipe</div>
+    <button class="ai-refresh-btn" onclick="gerarAnaliseIA()">⟳ Atualizar análise</button>
+  </div>
+  <div id="iaContent">
+    <div class="ai-loading"><div class="spinner"></div>Preparando análise...</div>
+  </div>
+</div>
+</div><!-- /tab-ia -->
+
+<script>
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach((b,i) => {
+    b.classList.toggle('active', ['overview','ranking','ia'][i] === tab);
+  });
+  document.querySelectorAll('.tab-page').forEach(p => {
+    p.classList.toggle('active', p.id === 'tab-'+tab);
+  });
+  if(tab === 'ranking') buildRankingTab();
+  if(tab === 'ia') gerarAnaliseIA();
+}
+
+/* =============================================================
+   DADOS
+============================================================= */
+const MONTHS = ['Out/25','Nov/25','Dez/25','Jan/26','Fev/26','Mar/26','Abr/26'];
+const TT = {backgroundColor:'#1e2536',borderColor:'rgba(255,255,255,0.1)',borderWidth:1,titleColor:'#e8eaf0',bodyColor:'#94a3b8'};
+
+// ---- INTERNO ----
+const INT_VENDORS = ['Ana Rocha','Meire Ramilo','Natália Agnes','Maisa Freitas','Carol Monteiro','Amanda','Mara Souza','Guilherme'];
+const INT_COLORS  = ['#3b82f6','#22d3ee','#a78bfa','#818cf8','#60a5fa','#93c5fd','#38bdf8','#6366f1'];
+const INT_DATA = {
+  'Ana Rocha':      [42,30,44,11,32,31,22],
+  'Meire Ramilo':   [39,30,33,37,20,40,37],
+  'Natália Agnes':  [34,35,31,32,29,27,20],
+  'Maisa Freitas':  [ 0, 0, 0, 0, 0, 1,19],
+  'Carol Monteiro': [41,20,28,32,31,26,23],
+  'Amanda':         [ 7,19,12,23,20,20,15],
+  'Mara Souza':     [10,15,11,25,16,35,21],
+  'Guilherme':      [32,22,19,32,15,28,12],
+};
+const INT_META = 212;
+// Abril/26: realizado até dia 08/04
+const INT_ABR  = 169; // interno abril
+
+// ---- EXTERNO ----
+const EXT_VENDORS = ['Vanessa','Julia','Tainara'];
+const EXT_COLORS  = ['#f59e0b','#fb923c','#fcd34d'];
+const EXT_DATA = {
+  'Vanessa': [25,25,15,19,18,16,15],
+  'Julia':   [26,18,14,21,12,26,11],
+  'Tainara': [23,21,16,23,14,26,14],
+};
+const EXT_META = 65;
+const EXT_ABR  = 40; // externo abril
+
+// ---- METAS ABRIL ----
+// Abril tem 30 dias, domingos: 5,12,19,26 = 4 domingos → 26 dias úteis
+// Hoje é dia 08/04 → trabalhados: 7 dias (1,2,3,4,5,6,7,8 - domingo 5)
+const DIAS_TRABALHADOS = 23;
+const DIAS_UTEIS_MES   = 26;
+const DIAS_RESTANTES   = 3;
+
+// ---- AGREGADOS ----
+const ALL_VENDORS = [...INT_VENDORS, ...EXT_VENDORS];
+const ALL_COLORS  = [...INT_COLORS,  ...EXT_COLORS];
+const ALL_DATA    = {...INT_DATA, ...EXT_DATA};
+
+const intMonthly = MONTHS.map((_,i) => INT_VENDORS.reduce((s,v)=>s+INT_DATA[v][i],0));
+const extMonthly = MONTHS.map((_,i) => EXT_VENDORS.reduce((s,v)=>s+EXT_DATA[v][i],0));
+const allMonthly = MONTHS.map((_,i) => intMonthly[i] + extMonthly[i]);
+
+const intTotal  = intMonthly.reduce((a,b)=>a+b,0);
+const extTotal  = extMonthly.reduce((a,b)=>a+b,0);
+const grandTotal = intTotal + extTotal;
+
+const vendorTotals = {};
+ALL_VENDORS.forEach(v => { vendorTotals[v] = ALL_DATA[v].reduce((a,b)=>a+b,0); });
+
+Chart.defaults.color       = '#6b7280';
+Chart.defaults.borderColor = 'rgba(255,255,255,0.05)';
+Chart.defaults.font.family = "'DM Sans',sans-serif";
+
+/* =============================================================
+   KPIs GERAIS
+============================================================= */
+(function(){
+  const varPct = ((allMonthly[6]-allMonthly[5])/allMonthly[5]*100).toFixed(1);
+  const isUp = varPct >= 0;
+  const bestV = ALL_VENDORS.reduce((b,v) => vendorTotals[v]>vendorTotals[b]?v:b, ALL_VENDORS[0]);
+  const bestTeam = INT_VENDORS.includes(bestV) ? 'Interno' : 'Externo';
+  const totalMeta = INT_META + EXT_META;
+  const totalAbr  = INT_ABR + EXT_ABR;
+  const pctMeta   = (totalAbr/totalMeta*100).toFixed(1);
+
+  const kpis = [
+    { cls:'total', icon:'📦', label:'Total Consolidado', val: grandTotal.toLocaleString('pt-BR'), sub:`Acumulado Out/25 → Abr/26 · todos os times` },
+    { cls:'int',   icon:'🏢', label:'Total Interno',     val: intTotal.toLocaleString('pt-BR'),   sub:`8 vendedores · ${MONTHS[0]} → ${MONTHS[6]}` },
+    { cls:'ext',   icon:'🌐', label:'Total Externo',     val: extTotal.toLocaleString('pt-BR'),   sub:`3 vendedoras · ${MONTHS[0]} → ${MONTHS[6]}` },
+    { cls:'green', icon:'⭐', label:'Melhor Vendedor',   val: bestV,                              sub:`${vendorTotals[bestV]} vendas · ${bestTeam}`, small:true },
+    { cls: isUp?'green':'red', icon: isUp?'📈':'📉', label:'Abr/26 vs Mar/26',
+      val:`${isUp?'+':''}${varPct}%`, sub:`${allMonthly[5]} → ${allMonthly[6]} vendas consolidadas` },
+    { cls:'amber', icon:'🎯', label:'Meta Abr/26 — Total', val:`${pctMeta}%`,
+      sub:`${totalAbr}/${totalMeta} · Int:${INT_ABR}/${INT_META} · Ext:${EXT_ABR}/${EXT_META}` },
+    { cls:'total', icon:'📊', label:'Média Mensal',        val: Math.round(grandTotal/7).toLocaleString('pt-BR'), sub:'Média por mês consolidada' },
+    { cls:'int',   icon:'👥', label:'Total Vendedores',    val: ALL_VENDORS.length, sub:'8 internos + 3 externos' },
+  ];
+
+  const g = document.getElementById('kpiGeral');
+  kpis.forEach(k => {
+    g.innerHTML += `<div class="kpi-card ${k.cls}">
+      <span class="kpi-icon">${k.icon}</span>
+      <div class="kpi-label">${k.label}</div>
+      <div class="kpi-value ${k.cls}" style="${k.small?'font-size:1rem;padding-top:4px':''}">${k.val}</div>
+      <div class="kpi-sub">${k.sub}</div>
+    </div>`;
+  });
+})();
+
+/* =============================================================
+   META DO MÊS
+============================================================= */
+(function(){
+  const el = document.getElementById('metaSection');
+
+  function makeCard(cls, title, sub, real, meta, color, proj, insight, insightCls) {
+    const pct    = (real/meta*100).toFixed(1);
+    const faltam = meta - real;
+    const projPct = Math.min(proj/meta*100,100).toFixed(0);
+    return `
+    <div class="meta-card ${cls}">
+      <div class="meta-title">${title}</div>
+      <div class="meta-sub">${sub}</div>
+      <div class="meta-nums">
+        <div class="meta-num"><div class="meta-num-val" style="color:var(--success)">${real}</div><div class="meta-num-lbl">Realizado</div></div>
+        <div class="meta-num"><div class="meta-num-val" style="color:var(--muted)">${meta}</div><div class="meta-num-lbl">Meta</div></div>
+        <div class="meta-num"><div class="meta-num-val" style="color:var(--danger)">${faltam}</div><div class="meta-num-lbl">Faltam</div></div>
+        <div class="meta-num"><div class="meta-num-val" style="color:var(--accent2)">${pct}%</div><div class="meta-num-lbl">Atingido</div></div>
+        <div class="meta-num"><div class="meta-num-val" style="color:var(--danger)">~${proj}</div><div class="meta-num-lbl">Expectativa</div></div>
+      </div>
+      <div class="meta-bar-wrap">
+        <div class="meta-bar-proj" style="width:${projPct}%;background:rgba(239,68,68,0.15)"></div>
+        <div style="position:absolute;right:0;top:-3px;height:16px;width:2px;background:rgba(16,185,129,0.7);z-index:2;border-radius:2px"></div>
+        <div class="meta-bar-real" style="width:${Math.min(real/meta*100,100).toFixed(1)}%;background:linear-gradient(90deg,${color},var(--accent2))"></div>
+      </div>
+      <div class="meta-bar-labels"><span>0</span><span style="color:var(--danger)">~${proj} exp.</span><span style="color:var(--success)">${meta} 🎯</span></div>
+      <div class="meta-insight ${insightCls}">${insight}</div>
+    </div>`;
+  }
+
+  const intRitmo = (INT_ABR/DIAS_TRABALHADOS).toFixed(1);
+  const intProj  = Math.round(INT_ABR/DIAS_TRABALHADOS*DIAS_UTEIS_MES);
+  const extRitmo = (EXT_ABR/DIAS_TRABALHADOS).toFixed(1);
+  const extProj  = Math.round(EXT_ABR/DIAS_TRABALHADOS*DIAS_UTEIS_MES);
+  const totReal  = INT_ABR + EXT_ABR;
+  const totMeta  = INT_META + EXT_META;
+  const totProj  = intProj + extProj;
+  const diasInfo = `Abril/2026 · 23 dias úteis trabalhados · 3 restantes`;
+
+  const statusInt = intProj >= INT_META ? 'ok' : 'danger';
+  const statusExt = extProj >= EXT_META ? 'ok' : 'danger';
+  const statusTot = totProj >= totMeta  ? 'ok' : 'danger';
+
+  el.innerHTML =
+    makeCard('int','🏢 Interno', diasInfo,
+      INT_ABR, INT_META,'#3b82f6', intProj,
+      `🚀 Ritmo <strong style="color:var(--accent2)">${intRitmo}/dia</strong> → projeção <strong style="color:var(--danger)">~${intProj}</strong>. Precisa <strong style="color:var(--ext)">${(( INT_META-INT_ABR)/DIAS_RESTANTES).toFixed(1)}/dia</strong> nos 19 dias restantes.`,
+      statusInt) +
+    makeCard('ext','🌐 Externo', diasInfo,
+      EXT_ABR, EXT_META,'#f59e0b', extProj,
+      `🚀 Ritmo <strong style="color:var(--accent2)">${extRitmo}/dia</strong> → projeção <strong style="color:var(--danger)">~${extProj}</strong>. Precisa <strong style="color:var(--ext)">${((EXT_META-EXT_ABR)/DIAS_RESTANTES).toFixed(1)}/dia</strong> nos 19 dias restantes.`,
+      statusExt) +
+    makeCard('total','🎯 Total Consolidado','Meta combinada: Interno 224 + Externo 65',
+      totReal, totMeta,'#a78bfa', totProj,
+      `🚀 Projeção total <strong style="color:var(--danger)">~${totProj}</strong> de <strong>${totMeta}</strong>. Precisa <strong style="color:var(--ext)">${((totMeta-totReal)/DIAS_RESTANTES).toFixed(1)}/dia</strong> consolidado nos 19 dias restantes.`,
+      statusTot);
+})();
+
+/* =============================================================
+   GRÁFICO EVOLUÇÃO
+============================================================= */
+(function(){
+  const ctx = document.getElementById('chartEvolucao').getContext('2d');
+  const g = ctx.createLinearGradient(0,0,0,220);
+  g.addColorStop(0,'rgba(167,139,250,0.25)'); g.addColorStop(1,'rgba(167,139,250,0)');
+  new Chart(ctx,{type:'line',data:{labels:MONTHS,datasets:[
+    { label:'Consolidado', data:allMonthly, borderColor:'#a78bfa', backgroundColor:g,
+      borderWidth:3, pointRadius:6, pointBackgroundColor:'#a78bfa',
+      pointBorderColor:'#0a0c12', pointBorderWidth:2, fill:true, tension:0.4 },
+    { label:'Interno', data:intMonthly, borderColor:'#3b82f6', backgroundColor:'transparent',
+      borderWidth:2, borderDash:[5,4], pointRadius:4, pointBackgroundColor:'#3b82f6', fill:false, tension:0.4 },
+    { label:'Externo', data:extMonthly, borderColor:'#f59e0b', backgroundColor:'transparent',
+      borderWidth:2, borderDash:[5,4], pointRadius:4, pointBackgroundColor:'#f59e0b', fill:false, tension:0.4 },
+    { label:'Meta Int+Ext', data:MONTHS.map(()=>INT_META+EXT_META), borderColor:'rgba(16,185,129,0.5)',
+      backgroundColor:'transparent', borderWidth:1.5, borderDash:[4,4], pointRadius:0, fill:false, tension:0 },
+  ]},options:{responsive:true,interaction:{mode:'index',intersect:false},
+    plugins:{legend:{labels:{color:'#94a3b8',font:{size:11},boxWidth:12}},tooltip:TT},
+    scales:{x:{grid:{display:false}},y:{grid:{color:'rgba(255,255,255,0.04)'}}}
+  }});
+})();
+
+/* =============================================================
+   DONUT
+============================================================= */
+(function(){
+  const ctx = document.getElementById('chartDonut').getContext('2d');
+  new Chart(ctx,{type:'doughnut',data:{
+    labels:['Interno','Externo'],
+    datasets:[{ data:[intTotal,extTotal],
+      backgroundColor:['rgba(59,130,246,0.8)','rgba(245,158,11,0.8)'],
+      borderColor:'#161b28', borderWidth:3, hoverOffset:6 }]
+  },options:{cutout:'60%',responsive:true,plugins:{
+    legend:{position:'bottom',labels:{color:'#94a3b8',font:{size:12},boxWidth:12,padding:12,usePointStyle:true}},
+    tooltip:{...TT,callbacks:{label:c=>` ${c.label}: ${c.parsed} (${(c.parsed/grandTotal*100).toFixed(1)}%)`}}
+  }}});
+})();
+
+/* =============================================================
+   RANKINGS
+============================================================= */
+(function(){
+  function buildRank(id, data) {
+    const tbl  = document.getElementById(id);
+    const sorted = Object.entries(data).sort((a,b)=>b[1]-a[1]);
+    const max  = sorted[0][1];
+    const medals = ['gold','silver','bronze'];
+    sorted.forEach(([name,val],i) => {
+      const color = ALL_COLORS[ALL_VENDORS.indexOf(name)];
+      const isInt = INT_VENDORS.includes(name);
+      const pct = (val/max*100).toFixed(1);
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td class="pos ${medals[i]||''}">${i+1}</td>
+        <td style="padding:9px 8px">
+          <div style="color:var(--text);font-weight:500">${name}</div>
+          <div style="font-size:0.65rem;color:${isInt?'var(--int)':'var(--ext)'}">${isInt?'Interno':'Externo'}</div>
+        </td>
+        <td class="rank-bar-wrap"><div class="rank-bar-bg"><div class="rank-bar-fill" style="width:${pct}%;background:${color}"></div></div></td>
+        <td class="rank-val" style="color:${color}">${val}</td>`;
+      tbl.appendChild(tr);
+    });
+  }
+  buildRank('rankGeral', vendorTotals);
+  const marData = {};
+  ALL_VENDORS.forEach(v => { marData[v] = ALL_DATA[v][6]; });
+  buildRank('rankMar', marData);
+})();
+
+/* =============================================================
+   CARDS INDIVIDUAIS
+============================================================= */
+(function(){
+  const container = document.getElementById('vendorCards');
+  // Metas individuais reais
+  const META_IND = {
+    // Interno
+    'Ana Rocha':32,'Meire Ramilo':32,'Natália Agnes':20,'Maisa Freitas':10,
+    'Carol Monteiro':32,'Amanda':32,'Mara Souza':32,'Guilherme':32,
+    // Externo — metas reais
+    'Vanessa':15,'Julia':25,'Tainara':25,
+  };
+
+  ALL_VENDORS.forEach((v,i) => {
+    const isInt = INT_VENDORS.includes(v);
+    const color = ALL_COLORS[i];
+    const total = vendorTotals[v];
+    const abr   = ALL_DATA[v][6] || 0;
+    const mar   = ALL_DATA[v][5];
+    const best  = Math.max(...ALL_DATA[v]);
+    const bestM = MONTHS[ALL_DATA[v].indexOf(best)];
+    const avg   = Math.round(total/MONTHS.length);
+    const metaInd = META_IND[v] || 32;
+    const pctMeta = (abr / metaInd * 100).toFixed(0);
+    const barW    = Math.min(abr/metaInd*100,100).toFixed(0);
+    const barColor = abr>=metaInd?'var(--success)':abr/metaInd>=0.7?color:'var(--danger)';
+
+    container.innerHTML += `
+    <div class="vendor-card" style="border-color:${color}22">
+      <div style="position:absolute;top:0;left:0;right:0;height:3px;border-radius:16px 16px 0 0;background:${color}"></div>
+      <div class="vc-header">
+        <div class="vc-name" style="color:${color}">${v}</div>
+        <span class="vc-team ${isInt?'int':'ext'}">${isInt?'Interno':'Externo'}</span>
+      </div>
+      <div class="vc-stats">
+        <div class="vc-stat"><div class="vc-stat-val" style="color:${color}">${total}</div><div class="vc-stat-lbl">Total</div></div>
+        <div class="vc-stat"><div class="vc-stat-val" style="color:var(--success)">${abr}</div><div class="vc-stat-lbl">Abr/26</div></div>
+        <div class="vc-stat"><div class="vc-stat-val">${avg}</div><div class="vc-stat-lbl">Média/mês</div></div>
+      </div>
+      <div style="font-size:0.7rem;color:var(--muted);margin-bottom:6px">Abr/26: ${abr}/${metaInd} da meta (${pctMeta}%)</div>
+      <div class="vc-bar-wrap"><div class="vc-bar-fill" style="width:${barW}%;background:${barColor}"></div></div>
+      <div class="vc-bar-label"><span>0</span><span style="color:${barColor}">${pctMeta}%</span><span>${metaInd} meta</span></div>
+      <div class="vc-months">
+        ${MONTHS.map((m,mi)=>`<div class="vc-month ${ALL_DATA[v][mi]===best?'best':''}" title="${m}: ${ALL_DATA[v][mi]}">${m.split('/')[0]}: <strong>${ALL_DATA[v][mi]}</strong></div>`).join('')}
+      </div>
+      <div style="font-size:0.68rem;color:var(--muted);margin-top:8px">🏆 Melhor mês: <strong style="color:var(--success)">${bestM} · ${best} vendas</strong></div>
+    </div>`;
+  });
+})();
+
+/* =============================================================
+   GRÁFICO MENSAL — INTERNO
+============================================================= */
+(function(){
+  const ctx = document.getElementById('chartVendInt').getContext('2d');
+  new Chart(ctx,{type:'line',data:{labels:MONTHS,datasets:INT_VENDORS.map((v,i)=>({
+    label:v, data:INT_DATA[v], borderColor:INT_COLORS[i], backgroundColor:INT_COLORS[i]+'18',
+    borderWidth:2.5, pointRadius:5, pointBackgroundColor:INT_COLORS[i],
+    pointBorderColor:'#0a0c12', pointBorderWidth:1.5, tension:0.4, fill:false
+  }))},options:{responsive:true,interaction:{mode:'index',intersect:false},
+    plugins:{legend:{labels:{color:'#94a3b8',font:{size:10},boxWidth:10,pointStyle:'circle',usePointStyle:true}},tooltip:TT},
+    scales:{x:{grid:{display:false}},y:{grid:{color:'rgba(255,255,255,0.04)'}}}
+  }});
+})();
+
+/* =============================================================
+   GRÁFICO MENSAL — EXTERNO
+============================================================= */
+(function(){
+  const ctx = document.getElementById('chartVendExt').getContext('2d');
+  new Chart(ctx,{type:'line',data:{labels:MONTHS,datasets:EXT_VENDORS.map((v,i)=>({
+    label:v, data:EXT_DATA[v], borderColor:EXT_COLORS[i], backgroundColor:EXT_COLORS[i]+'18',
+    borderWidth:2.5, pointRadius:5, pointBackgroundColor:EXT_COLORS[i],
+    pointBorderColor:'#0a0c12', pointBorderWidth:1.5, tension:0.4, fill:false
+  }))},options:{responsive:true,interaction:{mode:'index',intersect:false},
+    plugins:{legend:{labels:{color:'#94a3b8',font:{size:11},boxWidth:12,pointStyle:'circle',usePointStyle:true}},tooltip:TT},
+    scales:{x:{grid:{display:false}},y:{grid:{color:'rgba(255,255,255,0.04)'}}}
+  }});
+})();
+
+/* =============================================================
+   COMPARATIVO TIMES
+============================================================= */
+(function(){
+  const ctx = document.getElementById('chartTimes').getContext('2d');
+  new Chart(ctx,{type:'bar',data:{labels:MONTHS,datasets:[
+    { label:'Interno', data:intMonthly, backgroundColor:'rgba(59,130,246,0.75)', borderRadius:6, borderSkipped:false },
+    { label:'Externo', data:extMonthly, backgroundColor:'rgba(245,158,11,0.75)', borderRadius:6, borderSkipped:false },
+  ]},options:{responsive:true,interaction:{mode:'index',intersect:false},
+    plugins:{legend:{labels:{color:'#94a3b8',font:{size:11},boxWidth:12}},tooltip:TT},
+    scales:{x:{grid:{display:false}},y:{grid:{color:'rgba(255,255,255,0.04)'},stacked:false}}
+  }});
+})();
+
+/* =============================================================
+   RANKING TAB
+============================================================= */
+function buildRankingTab() {
+  // --- Ranking acumulado ---
+  const allV = [...INT_VENDORS, ...EXT_VENDORS];
+  const allC = [...INT_COLORS,  ...EXT_COLORS];
+  const allD = {...INT_DATA, ...EXT_DATA};
+  const totals = allV.map(v => allD[v].reduce((a,b)=>a+b,0));
+
+  const sorted = allV.map((v,i)=>({
+    name:v, total:totals[i], color:allC[i],
+    isInt: INT_VENDORS.includes(v),
+    monthly: allD[v],
+  })).sort((a,b)=>b.total-a.total);
+
+  const medals = ['gold','silver','bronze'];
+  const tbl = document.getElementById('rankFullTable');
+  if(tbl.innerHTML) return; // já construído
+
+  sorted.forEach((item,idx) => {
+    const pct = (item.total/sorted[0].total*100).toFixed(0);
+    const team = item.isInt ? `<span style="font-size:0.62rem;padding:1px 6px;border-radius:100px;background:rgba(59,130,246,0.15);color:#3b82f6">INT</span>`
+                            : `<span style="font-size:0.62rem;padding:1px 6px;border-radius:100px;background:rgba(245,158,11,0.15);color:#f59e0b">EXT</span>`;
+    const best = Math.max(...item.monthly);
+    const bestM = MONTHS[item.monthly.indexOf(best)];
+    const aprVal = item.monthly[6] || 0;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="rank-pos ${medals[idx]||''}">${idx+1}</td>
+      <td style="padding:12px 10px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="color:${item.color};font-weight:600;font-size:0.9rem">${item.name}</div>
+          ${team}
+        </div>
+        <div style="font-size:0.68rem;color:var(--muted);margin-top:2px">Melhor mês: ${bestM} (${best}) · Abr/26: ${aprVal}</div>
+      </td>
+      <td style="padding:12px 8px;min-width:180px">
+        <div style="background:rgba(255,255,255,0.06);border-radius:100px;height:6px;overflow:hidden">
+          <div style="width:${pct}%;height:100%;background:${item.color};border-radius:100px"></div>
+        </div>
+      </td>
+      <td style="font-family:'Syne',sans-serif;font-weight:800;font-size:1.1rem;color:${item.color};text-align:right;padding:12px 0 12px 8px">${item.total}</td>`;
+    tbl.appendChild(tr);
+  });
+
+  // --- Ranking abril ---
+  const sortedAbr = allV.map((v,i)=>({
+    name:v, val:allD[v][6]||0, color:allC[i], isInt:INT_VENDORS.includes(v)
+  })).sort((a,b)=>b.val-a.val);
+  const maxAbr = sortedAbr[0].val || 1;
+  const tbl2 = document.getElementById('rankAbrTable');
+  sortedAbr.forEach((item,idx)=>{
+    if(item.val === 0 && idx > 0) return; // pula zeros exceto se for único
+    const pct = (item.val/maxAbr*100).toFixed(0);
+    const team = item.isInt
+      ? `<span style="font-size:0.62rem;padding:1px 6px;border-radius:100px;background:rgba(59,130,246,0.15);color:#3b82f6">INT</span>`
+      : `<span style="font-size:0.62rem;padding:1px 6px;border-radius:100px;background:rgba(245,158,11,0.15);color:#f59e0b">EXT</span>`;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="rank-pos ${medals[idx]||''}">${idx+1}</td>
+      <td style="padding:10px 10px;display:flex;align-items:center;gap:6px">
+        <span style="color:${item.color};font-weight:600">${item.name}</span>${team}
+      </td>
+      <td style="padding:10px 8px;min-width:120px">
+        <div style="background:rgba(255,255,255,0.06);border-radius:100px;height:5px;overflow:hidden">
+          <div style="width:${pct}%;height:100%;background:${item.color};border-radius:100px"></div>
+        </div>
+      </td>
+      <td style="font-family:'Syne',sans-serif;font-weight:800;color:${item.color};text-align:right;padding:10px 0 10px 8px">${item.val}</td>`;
+    tbl2.appendChild(tr);
+  });
+
+  // --- Movimentação Mar → Abr ---
+  const rankMar = [...allV].sort((a,b)=>(allD[b][5]||0)-(allD[a][5]||0));
+  const rankAbr = [...allV].sort((a,b)=>(allD[b][6]||0)-(allD[a][6]||0));
+  const mov = document.getElementById('rankMovimento');
+  rankAbr.forEach((v,i) => {
+    const posMar = rankMar.indexOf(v);
+    const diff = posMar - i;
+    const arrow = diff > 0 ? `<span style="color:var(--success)">↑${diff}</span>`
+                : diff < 0 ? `<span style="color:var(--danger)">↓${Math.abs(diff)}</span>`
+                : `<span style="color:var(--muted)">→</span>`;
+    const color = allC[allV.indexOf(v)];
+    mov.innerHTML += `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:0.82rem">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-family:'Syne',sans-serif;font-weight:800;color:var(--muted);width:20px">${i+1}º</span>
+        <span style="color:${color};font-weight:600">${v}</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px">
+        <span style="color:var(--muted);font-size:0.75rem">${allD[v][6]||0} vendas</span>
+        <span style="font-family:'Syne',sans-serif;font-weight:700;min-width:28px;text-align:right">${arrow}</span>
+      </div>
+    </div>`;
+  });
+}
+
+/* =============================================================
+   ANÁLISE DE IA
+============================================================= */
+function gerarAnaliseIA() {
+  const el = document.getElementById('iaContent');
+
+  // Calcula dados em tempo real com os dados atuais
+  const allD = {...INT_DATA,...EXT_DATA};
+  const allV = [...INT_VENDORS,...EXT_VENDORS];
+  const intAbr = INT_VENDORS.reduce((s,v)=>s+(INT_DATA[v][6]||0),0);
+  const extAbr = EXT_VENDORS.reduce((s,v)=>s+(EXT_DATA[v][6]||0),0);
+  const totAbr = intAbr + extAbr;
+  const totMeta = INT_META + EXT_META;
+  const intPct = (intAbr/INT_META*100).toFixed(1);
+  const extPct = (extAbr/EXT_META*100).toFixed(1);
+  const totPct = (totAbr/totMeta*100).toFixed(1);
+  const intRitmo = (intAbr/DIAS_TRABALHADOS).toFixed(1);
+  const extRitmo = (extAbr/DIAS_TRABALHADOS).toFixed(1);
+  const intProj = Math.round(intAbr/DIAS_TRABALHADOS*DIAS_UTEIS_MES);
+  const extProj = Math.round(extAbr/DIAS_TRABALHADOS*DIAS_UTEIS_MES);
+  const intFalta = Math.max(0,INT_META-intAbr);
+  const extFalta = Math.max(0,EXT_META-extAbr);
+  const needInt = (intFalta/DIAS_RESTANTES).toFixed(1);
+  const needExt = (extFalta/DIAS_RESTANTES).toFixed(1);
+
+  // Rankings Abril
+  const intRank = [...INT_VENDORS].map(v=>({name:v,val:INT_DATA[v][6]||0})).sort((a,b)=>b.val-a.val);
+  const extRank = [...EXT_VENDORS].map(v=>({name:v,val:EXT_DATA[v][6]||0})).sort((a,b)=>b.val-a.val);
+  const top1 = intRank[0], top2 = intRank[1];
+
+  // Var mês
+  const intMar = INT_VENDORS.reduce((s,v)=>s+(INT_DATA[v][5]||0),0);
+  const varPct = ((intAbr-intMar)/intMar*100).toFixed(1);
+
+  // Consultores abaixo de 60% da meta individual
+  const META_IND_LOCAL = {'Ana Rocha':32,'Meire Ramilo':32,'Natália Agnes':20,'Maisa Freitas':10,'Carol Monteiro':32,'Amanda':32,'Mara Souza':32,'Guilherme':32,'Vanessa':15,'Julia':25,'Tainara':25};
+  const emRisco = allV.filter(v=>{
+    const val = allD[v][6]||0;
+    const meta = META_IND_LOCAL[v]||32;
+    return val/meta < 0.7;
+  });
+  const acimaMeta = allV.filter(v=>{
+    const val = allD[v][6]||0;
+    const meta = META_IND_LOCAL[v]||32;
+    return val >= meta;
+  });
+
+  const mc = (tipo,icon,titulo,corpo) => `
+    <div class="ai-card ${tipo}">
+      <div class="ai-card-title">${icon} ${titulo}</div>
+      <div class="ai-card-body">${corpo}</div>
+    </div>`;
+
+  el.innerHTML = `
+    ${mc('insight','📋','Visão Geral — Abril/26',
+      `Em Abril o time consolidado realizou <strong>${totAbr} contratos de ${totMeta}</strong>, atingindo <strong>${totPct}% da meta combinada</strong> com ${DIAS_RESTANTES} dias úteis restantes.
+      O time interno está em <strong>${intPct}%</strong> (${intAbr}/${INT_META}) e o externo em <strong>${extPct}%</strong> (${extAbr}/${EXT_META}).
+      A projeção para fechamento é de <strong>~${intProj} contratos internos</strong> e <strong>~${extProj} externos</strong> ao ritmo atual.`
+    )}
+
+    <div class="ai-grid">
+      <div>
+        <div class="section-label" style="margin-bottom:12px">✅ Destaques Positivos</div>
+
+        ${mc('positive','🏆','Líderes de Abril',
+          `<strong>${top1.name}</strong> lidera o interno com <strong>${top1.val} contratos</strong>, seguido de <strong>${top2.name} (${top2.val})</strong>.
+          No externo, <strong>${extRank[0].name}</strong> está na frente com <strong>${extRank[0].val} contratos</strong> — já acima de sua meta de 15!`
+        )}
+
+        ${acimaMeta.length > 0 ? mc('positive','🎯','Metas Individuais Batidas',
+          `Os consultores que já atingiram ou superaram a meta individual em Abril:
+          <strong>${acimaMeta.join(', ')}</strong>. Parabéns pelo desempenho! 🎉`
+        ) : ''}
+
+        ${parseFloat(varPct) > 0 ? mc('positive','📈','Crescimento Acumulado',
+          `O time interno está acima do ritmo do mês anterior em termos de projeção.
+          Março fechou com <strong>${intMar} contratos</strong>. Com ${DIAS_RESTANTES} dias restantes, Abril projeta <strong>~${intProj}</strong>.`
+        ) : mc('neutral','📊','Comparativo com Março',
+          `Março fechou em <strong>${intMar} contratos</strong>. Abril projeta <strong>~${intProj}</strong> com ${DIAS_RESTANTES} dias restantes.
+          O time tem espaço para acelerar na reta final.`
+        )}
+      </div>
+
+      <div>
+        <div class="section-label" style="margin-bottom:12px">⚠️ Gargalos Identificados</div>
+
+        ${mc('alert','🚨','Reta Final Crítica — Interno',
+          `Faltam <strong>${intFalta} contratos</strong> para bater a meta interna de ${INT_META}.
+          Com apenas <strong>${DIAS_RESTANTES} dias úteis</strong> restantes, o time precisa de <strong>${needInt} contratos/dia</strong>.
+          Ritmo atual é de ${intRitmo}/dia — é necessário <strong>dobrar o esforço</strong> nos últimos dias.`
+        )}
+
+        ${mc('alert','⚡','Externo Precisa Acelerar',
+          `O time externo realizou <strong>${extAbr} de ${EXT_META} contratos</strong> (${extPct}%).
+          Para bater a meta, precisa de <strong>${needExt} contratos/dia</strong> nos próximos ${DIAS_RESTANTES} dias — ritmo atual é de apenas ${extRitmo}/dia.`
+        )}
+
+        ${emRisco.length > 0 ? mc('alert','👤','Consultores Abaixo de 70% da Meta',
+          `Os seguintes consultores estão com desempenho abaixo de 70% da meta individual em Abril:
+          <strong>${emRisco.join(', ')}</strong>. Atenção redobrada na reta final para minimizar o impacto no resultado geral.`
+        ) : ''}
+      </div>
+    </div>
+
+    <div class="section-label" style="margin-bottom:12px">💡 Insights Estratégicos</div>
+    <div class="ai-grid">
+      ${mc('insight','🔍','Concentração de Resultado',
+        `Os 3 maiores vendedores do time interno — <strong>${intRank[0].name} (${intRank[0].val})</strong>, <strong>${intRank[1].name} (${intRank[1].val})</strong> e <strong>${intRank[2]?.name||'-'} (${intRank[2]?.val||0})</strong> — respondem por <strong>${((intRank[0].val+intRank[1].val+(intRank[2]?.val||0))/intAbr*100).toFixed(0)}%</strong> do total interno de Abril.
+        A performance do time está fortemente dependente dos top performers.`
+      )}
+      ${mc('insight','📊','Projeção de Fechamento',
+        `Ao ritmo atual o time consolidado deve fechar Abril com aproximadamente <strong>~${intProj + extProj} contratos</strong> de ${totMeta}.
+        Para bater a meta total são necessários <strong>${(intFalta+extFalta)} contratos</strong> em ${DIAS_RESTANTES} dias — o equivalente a <strong>${((intFalta+extFalta)/DIAS_RESTANTES).toFixed(1)}/dia</strong>.`
+      )}
+    </div>
+
+    <div class="section-label" style="margin-bottom:12px">🎯 Recomendações</div>
+    ${mc('neutral','🤝','Foco na Reta Final',
+      `Com apenas <strong>${DIAS_RESTANTES} dias úteis restantes</strong>, priorizar o acompanhamento diário de cada consultor.
+      Concentrar esforços em <strong>follow-ups de leads quentes</strong> e reativar propostas em aberto para maximizar conversões nos últimos dias do mês.`
+    )}
+    ${mc('neutral','📞','Suporte aos Consultores em Risco',
+      `Consultores abaixo da meta individual precisam de <strong>apoio intensivo</strong> — seja em técnica de vendas, gestão da carteira ou motivação.
+      Uma reunião de alinhamento rápida nos próximos dias pode ajudar a destravar negócios parados.`
+    )}
+    ${mc('neutral','🌐','Externo: Urgência de Prospecção',
+      `O time externo está com ritmo abaixo do necessário. Com ${extFalta} contratos para fechar e ${DIAS_RESTANTES} dias,
+      é recomendável intensificar a prospecção ativa e priorizar leads com maior probabilidade de fechamento rápido.`
+    )}
+
+    <div style="margin-top:20px;padding:12px 16px;background:rgba(167,139,250,0.07);border:1px solid rgba(167,139,250,0.2);border-radius:12px;font-size:0.75rem;color:var(--muted)">
+      📅 Análise gerada com base nos dados de Abril/26 · ${DIAS_TRABALHADOS} dias úteis trabalhados · ${DIAS_RESTANTES} restantes · Atualizada automaticamente com os dados do dashboard.
+    </div>`;
+}
+</script>
+</body>
+</html>
